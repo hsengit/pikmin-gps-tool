@@ -20,16 +20,16 @@ header {visibility: hidden;}
     background: linear-gradient(135deg, #f1f8e9 0%, #e8f5e9 100%);
 }
 
-/* 1. 解決手機深色模式輸入框變黑的問題：強制白底黑字 */
+/* 解決手機深色模式輸入框變黑的問題：強制白底黑字 */
 input[type="text"] {
     background-color: #ffffff !important;
     color: #111111 !important;
-    -webkit-text-fill-color: #111111 !important; /* 針對 iOS Safari 的強制修復 */
+    -webkit-text-fill-color: #111111 !important;
     border: 2px solid #81C784 !important;
     border-radius: 10px !important;
 }
 
-/* 2. 上傳區塊極簡化：隱藏拖曳文字，只保留按鈕感 */
+/* 上傳區塊極簡化：隱藏拖曳文字，只保留按鈕感 */
 [data-testid="stFileUploadDropzone"] {
     background-color: #ffffff !important;
     border: 2px dashed #81C784 !important;
@@ -37,24 +37,24 @@ input[type="text"] {
 }
 [data-testid="stFileUploadDropzone"] > div > div > small,
 [data-testid="stFileUploadDropzone"] > div > div > span {
-    display: none !important; /* 隱藏 'Drag and drop file here' 字樣 */
+    display: none !important;
 }
 
-/* 3. 次要按鈕 (未點選的飾品類別)：淺綠底、深綠字，提高對比度 */
+/* 次要按鈕 (未點選的飾品類別)：淺綠底、深綠字，提高對比度 */
 button[kind="secondary"] {
     background-color: #E8F5E9 !important;
     color: #1B5E20 !important;
     border: 1px solid #81C784 !important;
     border-radius: 12px !important;
     font-weight: bold !important;
-    padding: 5px 10px !important;
+    padding: 2px 5px !important;
     transition: all 0.2s !important;
 }
 button[kind="secondary"]:hover {
     background-color: #C8E6C9 !important;
 }
 
-/* 4. 主要按鈕 (已點選的飾品類別、執行與下載按鈕)：深綠底、白字 */
+/* 主要按鈕 (已點選的飾品類別、執行與下載按鈕)：深綠底、白字 */
 button[kind="primary"] {
     background-color: #2E7D32 !important;
     color: #ffffff !important;
@@ -69,13 +69,27 @@ button[kind="primary"]:hover {
     transform: translateY(-2px) !important;
 }
 
+/* --- 核心魔法：讓按鈕群組在手機端完美橫向換行 --- */
+@media (max-width: 768px) {
+    div[data-testid="stHorizontalBlock"] {
+        flex-wrap: wrap !important;
+        flex-direction: row !important;
+    }
+    div[data-testid="column"] {
+        width: auto !important;
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        padding-right: 0.2rem !important; 
+        padding-left: 0.2rem !important;
+    }
+}
+
 /* 文字與標題統一為深綠色 */
 h1, h2, h3, p, span, label {
     color: #2E7D32 !important;
 }
 </style>
 """, unsafe_allow_html=True)
-
 
 def decimal_to_dms(decimal_degree):
     """將十進制度數轉換為 EXIF 格式所需的度、分、秒"""
@@ -120,7 +134,7 @@ def process_image(image_bytes, lat, lon):
 
 # --- 網頁介面設計 ---
 st.title("📍 皮克敏定位盆修改相片GPS")
-st.markdown("**版本號**：v1.2 (手機優化版) &nbsp;|&nbsp; **製作者**：HSEN")
+st.markdown("**版本號**：v1.3 (全類別自適應版) &nbsp;|&nbsp; **製作者**：HSEN")
 st.write("上傳 JPG 相片，快速修改 GPS 座標與屬性標籤，自動縮放長邊至 1024px。")
 
 if "photo_attr_input" not in st.session_state:
@@ -170,25 +184,36 @@ if uploaded_file is not None:
 
     photo_attr = st.text_input("🏷️ 定位相片屬性", value=st.session_state.photo_attr_input, key="attr_field")
     
-    categories = [
-        "餐廳", "咖啡廳", "甜點店", "電影院", "藥局", 
-        "動物園", "森林", "水邊", "郵局", "美術館", 
-        "機場", "車站", "海灘", "迷你小品", "理髮廳"
-    ]
+    # --- 飾品類別全收錄與動態排版 ---
+    categories_dict = {
+        "🍔 餐飲類": ["餐廳", "咖啡廳", "甜點店", "漢堡店", "披薩店", "壽司店", "拉麵店"],
+        "🛍️ 商店與購物類": ["便利商店", "超市", "麵包店", "理髮廳", "服飾店", "美妝店", "藥局", "電器行", "五金行"],
+        "🏛️ 休閒與公共設施": ["電影院", "遊樂園", "動物園", "美術館", "圖書館", "書店", "郵局", "體育場", "飯店", "神社", "寺廟"],
+        "🚉 交通類": ["車站", "公車站", "機場"],
+        "🌳 自然景觀類": ["公園", "森林", "水邊", "海灘", "山", "橋樑"]
+    }
     
-    st.write("👉 **快速填入飾器類別：**")
-    cols = st.columns(5)
-    for i, cat in enumerate(categories):
-        with cols[i % 5]:
-            # 【關鍵修改】動態判斷：如果該按鈕是目前輸入框的值，就給予 primary (深綠) 樣式，否則為 secondary (淺綠)
-            btn_type = "primary" if st.session_state.photo_attr_input == cat else "secondary"
-            if st.button(cat, key=f"btn_{cat}", type=btn_type, use_container_width=True):
-                st.session_state.photo_attr_input = cat
-                st.rerun()
+    st.write("👉 **快速填入飾品類別：**")
+    
+    for group_name, cats in categories_dict.items():
+        st.markdown(f"<div style='margin-top: 10px; margin-bottom: 5px; font-weight: bold; font-size: 14px; color: #1B5E20;'>{group_name}</div>", unsafe_allow_html=True)
+        
+        # 為了避免單行過擠，將類別依每 4~5 個切分成一行
+        chunk_size = 5
+        for i in range(0, len(cats), chunk_size):
+            chunk = cats[i:i+chunk_size]
+            
+            # 【關鍵排版】依據每個字串的長度作為欄位寬度的比例，例如 [4, 2, 3] -> 依字數完美分配寬度
+            cols = st.columns([len(c) for c in chunk])
+            for j, cat in enumerate(chunk):
+                with cols[j]:
+                    btn_type = "primary" if st.session_state.photo_attr_input == cat else "secondary"
+                    if st.button(cat, key=f"btn_{cat}", type=btn_type, use_container_width=True):
+                        st.session_state.photo_attr_input = cat
+                        st.rerun()
 
     st.markdown("---")
 
-    # 主要執行按鈕強制使用 primary 樣式
     if st.button("🚀 開始處理相片", type="primary", use_container_width=True):
         try:
             lat_str, lon_str = gps_coords.split(",")
