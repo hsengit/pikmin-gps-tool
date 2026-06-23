@@ -29,7 +29,7 @@ input[type="text"] {
     border-radius: 10px !important;
 }
 
-/* 上傳區塊極簡化：隱藏拖曳文字，只保留按鈕感 */
+/* 上傳區塊極簡化：隱藏拖曳文字 */
 [data-testid="stFileUploadDropzone"] {
     background-color: #ffffff !important;
     border: 2px dashed #81C784 !important;
@@ -40,36 +40,42 @@ input[type="text"] {
     display: none !important;
 }
 
-/* 次要按鈕 (未點選的飾品類別)：淺綠底、深綠字，提高對比度 */
+/* 次要按鈕 (未點選的飾品類別)：淺綠底、深綠字，精確控制按鈕內的文字顏色 */
 button[kind="secondary"] {
     background-color: #E8F5E9 !important;
-    color: #1B5E20 !important;
     border: 1px solid #81C784 !important;
     border-radius: 12px !important;
-    font-weight: bold !important;
     padding: 2px 5px !important;
     transition: all 0.2s !important;
+}
+button[kind="secondary"] * {
+    color: #1B5E20 !important;
+    -webkit-text-fill-color: #1B5E20 !important;
+    font-weight: bold !important;
 }
 button[kind="secondary"]:hover {
     background-color: #C8E6C9 !important;
 }
 
-/* 主要按鈕 (已點選的飾品類別、執行與下載按鈕)：深綠底、白字 */
+/* 主要按鈕 (已點選的飾品類別、執行與下載按鈕)：深綠底、白字，精確控制按鈕內的文字顏色 */
 button[kind="primary"] {
     background-color: #2E7D32 !important;
-    color: #ffffff !important;
     border: none !important;
     border-radius: 12px !important;
-    font-weight: bold !important;
     box-shadow: 0px 4px 10px rgba(0,0,0,0.2) !important;
     transition: all 0.2s !important;
+}
+button[kind="primary"] * {
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+    font-weight: bold !important;
 }
 button[kind="primary"]:hover {
     background-color: #1B5E20 !important;
     transform: translateY(-2px) !important;
 }
 
-/* --- 核心魔法：讓按鈕群組在手機端完美橫向換行 --- */
+/* 手機端完美橫向換行 */
 @media (max-width: 768px) {
     div[data-testid="stHorizontalBlock"] {
         flex-wrap: wrap !important;
@@ -84,8 +90,8 @@ button[kind="primary"]:hover {
     }
 }
 
-/* 文字與標題統一為深綠色 */
-h1, h2, h3, p, span, label {
+/* 標題與標籤文字顏色 (移除 p 標籤，避免影響按鈕內建文字) */
+h1, h2, h3, label {
     color: #2E7D32 !important;
 }
 </style>
@@ -134,11 +140,12 @@ def process_image(image_bytes, lat, lon):
 
 # --- 網頁介面設計 ---
 st.title("📍 皮克敏定位盆修改相片GPS")
-st.markdown("**版本號**：v1.3 (全類別自適應版) &nbsp;|&nbsp; **製作者**：HSEN")
+st.markdown("**版本號**：v1.4 (除錯優化版) &nbsp;|&nbsp; **製作者**：HSEN")
 st.write("上傳 JPG 相片，快速修改 GPS 座標與屬性標籤，自動縮放長邊至 1024px。")
 
-if "photo_attr_input" not in st.session_state:
-    st.session_state.photo_attr_input = ""
+# 【修正點 1】只需要初始化 attr_field
+if "attr_field" not in st.session_state:
+    st.session_state.attr_field = ""
 
 uploaded_file = st.file_uploader("📂 點擊按鈕上傳相片", type=["jpg", "jpeg"])
 
@@ -182,9 +189,9 @@ if uploaded_file is not None:
     </script>
     """, height=45)
 
-    photo_attr = st.text_input("🏷️ 定位相片屬性", value=st.session_state.photo_attr_input, key="attr_field")
+    # 【修正點 2】只綁定 key，不使用 value，這樣修改 session_state 才能正確連動畫面
+    photo_attr = st.text_input("🏷️ 定位相片屬性", key="attr_field")
     
-    # --- 飾品類別全收錄與動態排版 ---
     categories_dict = {
         "🍔 餐飲類": ["餐廳", "咖啡廳", "甜點店", "漢堡店", "披薩店", "壽司店", "拉麵店"],
         "🛍️ 商店與購物類": ["便利商店", "超市", "麵包店", "理髮廳", "服飾店", "美妝店", "藥局", "電器行", "五金行"],
@@ -198,18 +205,18 @@ if uploaded_file is not None:
     for group_name, cats in categories_dict.items():
         st.markdown(f"<div style='margin-top: 10px; margin-bottom: 5px; font-weight: bold; font-size: 14px; color: #1B5E20;'>{group_name}</div>", unsafe_allow_html=True)
         
-        # 為了避免單行過擠，將類別依每 4~5 個切分成一行
         chunk_size = 5
         for i in range(0, len(cats), chunk_size):
             chunk = cats[i:i+chunk_size]
             
-            # 【關鍵排版】依據每個字串的長度作為欄位寬度的比例，例如 [4, 2, 3] -> 依字數完美分配寬度
             cols = st.columns([len(c) for c in chunk])
             for j, cat in enumerate(chunk):
                 with cols[j]:
-                    btn_type = "primary" if st.session_state.photo_attr_input == cat else "secondary"
+                    # 【修正點 3】判斷條件改為讀取 session_state.attr_field
+                    btn_type = "primary" if st.session_state.attr_field == cat else "secondary"
                     if st.button(cat, key=f"btn_{cat}", type=btn_type, use_container_width=True):
-                        st.session_state.photo_attr_input = cat
+                        # 點擊後直接修改 attr_field，畫面會自動刷新並帶入輸入框
+                        st.session_state.attr_field = cat
                         st.rerun()
 
     st.markdown("---")
@@ -233,6 +240,7 @@ if uploaded_file is not None:
                     processed_bytes = process_image(uploaded_file.getvalue(), lat, lon)
                     st.success("✅ 處理完成！長邊已縮為 1024px，EXIF 保留完畢。")
 
+                    # 下載的檔名會正確讀取 photo_attr 裡面的值
                     clean_gps_str = gps_coords.replace(" ", "")
                     download_filename = f"{photo_attr}_{clean_gps_str}.jpg"
 
