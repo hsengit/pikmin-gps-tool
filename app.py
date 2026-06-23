@@ -90,13 +90,14 @@ button[kind="primary"]:hover {
     }
 }
 
-/* 標題與標籤文字顏色 (移除 p 標籤，避免影響按鈕內建文字) */
+/* 標題與標籤文字顏色 */
 h1, h2, h3, label {
     color: #2E7D32 !important;
 }
 </style>
 """, unsafe_allow_html=True)
 
+# --- 核心邏輯函式 ---
 def decimal_to_dms(decimal_degree):
     """將十進制度數轉換為 EXIF 格式所需的度、分、秒"""
     val = abs(decimal_degree)
@@ -138,12 +139,15 @@ def process_image(image_bytes, lat, lon):
     img_resized.save(output_io, format="jpeg", exif=exif_bytes)
     return output_io.getvalue()
 
+# 【重要修正】設計一個回呼函式 (Callback)，專門處理按鈕點擊後的文字更新
+def set_photo_attr(selected_category):
+    st.session_state.attr_field = selected_category
+
 # --- 網頁介面設計 ---
 st.title("📍 皮克敏定位盆修改相片GPS")
-st.markdown("**版本號**：v1.4 (除錯優化版) &nbsp;|&nbsp; **製作者**：HSEN")
+st.markdown("**版本號**：v1.5 (穩定版) &nbsp;|&nbsp; **製作者**：HSEN")
 st.write("上傳 JPG 相片，快速修改 GPS 座標與屬性標籤，自動縮放長邊至 1024px。")
 
-# 【修正點 1】只需要初始化 attr_field
 if "attr_field" not in st.session_state:
     st.session_state.attr_field = ""
 
@@ -189,7 +193,6 @@ if uploaded_file is not None:
     </script>
     """, height=45)
 
-    # 【修正點 2】只綁定 key，不使用 value，這樣修改 session_state 才能正確連動畫面
     photo_attr = st.text_input("🏷️ 定位相片屬性", key="attr_field")
     
     categories_dict = {
@@ -212,12 +215,16 @@ if uploaded_file is not None:
             cols = st.columns([len(c) for c in chunk])
             for j, cat in enumerate(chunk):
                 with cols[j]:
-                    # 【修正點 3】判斷條件改為讀取 session_state.attr_field
                     btn_type = "primary" if st.session_state.attr_field == cat else "secondary"
-                    if st.button(cat, key=f"btn_{cat}", type=btn_type, use_container_width=True):
-                        # 點擊後直接修改 attr_field，畫面會自動刷新並帶入輸入框
-                        st.session_state.attr_field = cat
-                        st.rerun()
+                    # 【重要修正】拔除 st.rerun，改用 on_click 呼叫 Callback 函式，完美避開狀態衝突
+                    st.button(
+                        cat, 
+                        key=f"btn_{cat}", 
+                        type=btn_type, 
+                        use_container_width=True,
+                        on_click=set_photo_attr,
+                        args=(cat,)
+                    )
 
     st.markdown("---")
 
@@ -240,7 +247,6 @@ if uploaded_file is not None:
                     processed_bytes = process_image(uploaded_file.getvalue(), lat, lon)
                     st.success("✅ 處理完成！長邊已縮為 1024px，EXIF 保留完畢。")
 
-                    # 下載的檔名會正確讀取 photo_attr 裡面的值
                     clean_gps_str = gps_coords.replace(" ", "")
                     download_filename = f"{photo_attr}_{clean_gps_str}.jpg"
 
