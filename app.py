@@ -7,62 +7,69 @@ import io
 # --- 頁面基本設定 (需放在腳本最上方) ---
 st.set_page_config(page_title="皮克敏定位盆工具", page_icon="📍", layout="centered")
 
-# --- CSS 介面美化注入 ---
+# --- CSS 介面美化與手機端優化注入 ---
 st.markdown("""
 <style>
-/* 隱藏 Streamlit 預設的右上角選單與底部 Footer */
+/* 隱藏 Streamlit 預設選單與 Footer */
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 header {visibility: hidden;}
 
-/* 全域背景漸層 (清新自然風) */
+/* 全域背景漸層 */
 .stApp {
     background: linear-gradient(135deg, #f1f8e9 0%, #e8f5e9 100%);
 }
 
-/* 按鈕全域美化 (包含上傳按鈕與執行按鈕) */
-.stButton > button, .stDownloadButton > button {
-    background-color: #4CAF50 !important; /* 皮克敏綠 */
-    color: white !important;
-    border-radius: 20px !important;
-    border: none !important;
-    padding: 10px 24px !important;
-    font-weight: bold !important;
-    transition: all 0.3s ease 0s !important;
-    box-shadow: 0px 4px 10px rgba(0,0,0,0.1) !important;
+/* 1. 解決手機深色模式輸入框變黑的問題：強制白底黑字 */
+input[type="text"] {
+    background-color: #ffffff !important;
+    color: #111111 !important;
+    -webkit-text-fill-color: #111111 !important; /* 針對 iOS Safari 的強制修復 */
+    border: 2px solid #81C784 !important;
+    border-radius: 10px !important;
 }
-.stButton > button:hover, .stDownloadButton > button:hover {
-    background-color: #45a049 !important;
-    box-shadow: 0px 6px 15px rgba(0,0,0,0.2) !important;
+
+/* 2. 上傳區塊極簡化：隱藏拖曳文字，只保留按鈕感 */
+[data-testid="stFileUploadDropzone"] {
+    background-color: #ffffff !important;
+    border: 2px dashed #81C784 !important;
+    border-radius: 15px !important;
+}
+[data-testid="stFileUploadDropzone"] > div > div > small,
+[data-testid="stFileUploadDropzone"] > div > div > span {
+    display: none !important; /* 隱藏 'Drag and drop file here' 字樣 */
+}
+
+/* 3. 次要按鈕 (未點選的飾品類別)：淺綠底、深綠字，提高對比度 */
+button[kind="secondary"] {
+    background-color: #E8F5E9 !important;
+    color: #1B5E20 !important;
+    border: 1px solid #81C784 !important;
+    border-radius: 12px !important;
+    font-weight: bold !important;
+    padding: 5px 10px !important;
+    transition: all 0.2s !important;
+}
+button[kind="secondary"]:hover {
+    background-color: #C8E6C9 !important;
+}
+
+/* 4. 主要按鈕 (已點選的飾品類別、執行與下載按鈕)：深綠底、白字 */
+button[kind="primary"] {
+    background-color: #2E7D32 !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 12px !important;
+    font-weight: bold !important;
+    box-shadow: 0px 4px 10px rgba(0,0,0,0.2) !important;
+    transition: all 0.2s !important;
+}
+button[kind="primary"]:hover {
+    background-color: #1B5E20 !important;
     transform: translateY(-2px) !important;
 }
 
-/* 快捷類別小按鈕稍微調整，區分主次 */
-div[data-testid="column"] .stButton > button {
-    background-color: #81C784 !important;
-    padding: 5px 10px !important;
-    font-size: 14px !important;
-    border-radius: 12px !important;
-}
-div[data-testid="column"] .stButton > button:hover {
-    background-color: #66BB6A !important;
-}
-
-/* 文字輸入框美化 */
-.stTextInput > div > div > input {
-    border-radius: 10px !important;
-    border: 2px solid #A5D6A7 !important;
-    padding: 8px 12px !important;
-}
-
-/* 上傳區塊背景淡化並加上虛線圓角 */
-.stFileUploader > div > div {
-    background-color: rgba(255, 255, 255, 0.6) !important;
-    border-radius: 15px !important;
-    border: 2px dashed #81C784 !important;
-}
-
-/* 文字與標題顏色統一為深綠自然色 */
+/* 文字與標題統一為深綠色 */
 h1, h2, h3, p, span, label {
     color: #2E7D32 !important;
 }
@@ -79,7 +86,6 @@ def decimal_to_dms(decimal_degree):
     return ((degrees, 1), (minutes, 1), (seconds, 1000))
 
 def process_image(image_bytes, lat, lon):
-    # 1. 處理 EXIF 定位資訊
     try:
         exif_dict = piexif.load(image_bytes)
     except Exception:
@@ -96,7 +102,6 @@ def process_image(image_bytes, lat, lon):
 
     exif_bytes = piexif.dump(exif_dict)
 
-    # 2. 讀取相片並縮放長邊至 1024 像素
     img = Image.open(io.BytesIO(image_bytes))
     width, height = img.size
     
@@ -109,20 +114,19 @@ def process_image(image_bytes, lat, lon):
         
     img_resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
-    # 3. 輸出
     output_io = io.BytesIO()
     img_resized.save(output_io, format="jpeg", exif=exif_bytes)
     return output_io.getvalue()
 
 # --- 網頁介面設計 ---
 st.title("📍 皮克敏定位盆修改相片GPS")
-st.markdown("**版本號**：v1.1 (美化版) &nbsp;|&nbsp; **製作者**：HSEN")
+st.markdown("**版本號**：v1.2 (手機優化版) &nbsp;|&nbsp; **製作者**：HSEN")
 st.write("上傳 JPG 相片，快速修改 GPS 座標與屬性標籤，自動縮放長邊至 1024px。")
 
 if "photo_attr_input" not in st.session_state:
     st.session_state.photo_attr_input = ""
 
-uploaded_file = st.file_uploader("📂 請選擇相片", type=["jpg", "jpeg"])
+uploaded_file = st.file_uploader("📂 點擊按鈕上傳相片", type=["jpg", "jpeg"])
 
 if uploaded_file is not None:
     st.image(uploaded_file, caption="相片預覽", use_container_width=True)
@@ -176,12 +180,15 @@ if uploaded_file is not None:
     cols = st.columns(5)
     for i, cat in enumerate(categories):
         with cols[i % 5]:
-            if st.button(cat, key=f"btn_{cat}", use_container_width=True):
+            # 【關鍵修改】動態判斷：如果該按鈕是目前輸入框的值，就給予 primary (深綠) 樣式，否則為 secondary (淺綠)
+            btn_type = "primary" if st.session_state.photo_attr_input == cat else "secondary"
+            if st.button(cat, key=f"btn_{cat}", type=btn_type, use_container_width=True):
                 st.session_state.photo_attr_input = cat
                 st.rerun()
 
     st.markdown("---")
 
+    # 主要執行按鈕強制使用 primary 樣式
     if st.button("🚀 開始處理相片", type="primary", use_container_width=True):
         try:
             lat_str, lon_str = gps_coords.split(",")
@@ -209,6 +216,7 @@ if uploaded_file is not None:
                         data=processed_bytes,
                         file_name=download_filename,
                         mime="image/jpeg",
+                        type="primary",
                         use_container_width=True
                     )
                 except Exception as e:
